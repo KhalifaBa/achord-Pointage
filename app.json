@@ -9,7 +9,9 @@
     "splash": {
       "backgroundColor": "#0A0E1A"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.yourcompany.pointage"
@@ -19,6 +21,12 @@
         "backgroundColor": "#0A0E1A"
       },
       "package": "com.yourcompany.pointage"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0015462b-5dd0-4f7b-bc23-dfbac24cde4b"
+      }
+    },
+    "owner": "khaba"
   }
 }
