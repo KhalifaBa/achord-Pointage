@@ -11,6 +11,12 @@ const KEYS = {
   HISTORY_INDEX:  'history_index',
 };
 
+// ─── Constantes légales ─────────────────────────────────────────────
+// Pause écran réglementaire : 30 min/jour, déduite automatiquement du temps de travail effectif
+export const SCREEN_BREAK_MINUTES = 30;
+// Durée minimale légale de pause déjeuner (Art. L3121-16 Code du travail)
+export const LUNCH_MIN_MINUTES = 20;
+
 // ─── Paramètres utilisateur ─────────────────────────────────────────
 
 export async function saveSettings(settings) {
@@ -28,6 +34,8 @@ export async function loadSettings() {
     emailjsServiceId:  '',
     emailjsTemplateId: '',
     emailjsPublicKey:  '',
+    expectedArrival:   '09:00', // Heure d'arrivée contractuelle (HH:mm)
+    expectedDeparture: '18:00', // Heure de départ contractuelle (HH:mm)
   };
 }
 
@@ -91,21 +99,64 @@ export function durationMinutes(start, end) {
 
 export function formatDuration(minutes) {
   if (minutes === null || minutes === undefined) return '--';
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
+  const abs = Math.abs(minutes);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
   if (h === 0) return `${m}min`;
   return `${h}h${String(m).padStart(2, '0')}`;
 }
 
-export function computeSummary(timings) {
-  const { arrival, departure, coffeeMornStart, coffeeMornEnd, lunchStart, lunchEnd, coffeeAftnStart, coffeeAftnEnd } = timings;
+/**
+ * Calcule le delta (en minutes) entre l'heure réelle (ISO) et l'heure théorique (HH:mm).
+ * Valeur positive = en avance (ou départ tardif), négative = en retard (ou départ anticipé).
+ * Pour l'arrivée :  positif = en retard, négatif = en avance  → on inverse le signe
+ * Pour le départ  : positif = en avance (parti tôt), négatif = parti tard → on inverse
+ *
+ * Convention retournée : positif = AVANCE, négatif = RETARD
+ */
+export function computeDelta(actualIso, expectedHHmm, dateStr, mode = 'arrival') {
+  if (!actualIso || !expectedHHmm) return null;
+  const [hh, mm] = expectedHHmm.split(':').map(Number);
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  const expected = new Date(y, mo - 1, d, hh, mm, 0);
+  const actual   = new Date(actualIso);
+  const diffMin  = Math.round((actual - expected) / 60000);
+  // Arrivée : diff positif = en retard → retourner négatif (retard)
+  // Départ  : diff positif = parti tard  → retourner positif (avance = parti après l'heure)
+  if (mode === 'arrival') return -diffMin;
+  return diffMin;
+}
+
+/**
+ * Vérifie que la durée de déjeuner respecte le minimum légal.
+ * Retourne { ok, minutes } — ok = true si >= LUNCH_MIN_MINUTES ou non renseigné.
+ */
+export function lunchCheck(lunchStart, lunchEnd) {
+  if (!lunchStart || !lunchEnd) return { ok: true, minutes: null };
+  const minutes = durationMinutes(lunchStart, lunchEnd);
+  return { ok: minutes >= LUNCH_MIN_MINUTES, minutes };
+}
+
+export function computeSummary(timings, settings = {}) {
+  const {
+    arrival, departure,
+    coffeeMornStart, coffeeMornEnd,
+    lunchStart, lunchEnd,
+    coffeeAftnStart, coffeeAftnEnd,
+  } = timings;
+
   const coffeeMorn   = durationMinutes(coffeeMornStart, coffeeMornEnd);
   const lunch        = durationMinutes(lunchStart, lunchEnd);
   const coffeeAftn   = durationMinutes(coffeeAftnStart, coffeeAftnEnd);
   const totalPauses  = (coffeeMorn ?? 0) + (lunch ?? 0) + (coffeeAftn ?? 0);
   const totalPresence = durationMinutes(arrival, departure);
-  const effectiveWork = totalPresence !== null ? totalPresence - totalPauses : null;
-  return { coffeeMorn, lunch, coffeeAftn, totalPauses, totalPresence, effectiveWork };
+
+  // Temps de travail brut (présence - pauses explicites)
+  const grossWork = totalPresence !== null ? totalPresence - totalPauses : null;
+  // On déduit automatiquement la pause écran légale (30 min) — non visible par l'utilisateur
+  const effectiveWork = grossWork !== null ? grossWork - SCREEN_BREAK_MINUTES : null;
+
+  return { coffeeMorn, lunch, coffeeAftn, totalPauses, totalPresence, effectiveWork, grossWork };
 }
 
 export function formatTime(iso) {
@@ -118,4 +169,15 @@ export function formatDateFr(dateStr) {
   const [y, m, d] = dateStr.split('-');
   const date = new Date(Number(y), Number(m) - 1, Number(d));
   return format(date, 'EEEE d MMMM yyyy', { locale: fr });
+}
+
+/**
+ * Parse une saisie "HH:mm" et retourne un ISO string pour la date donnée,
+ * ou null si invalide.
+ */
+export function parseTimeInput(hhmm, dateStr) {
+  const match = hhmm.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return null;
+  const [y, mo, d] = dateStr.split('-').map(Number);
+  return new Date(y, mo - 1, d, Number(match[1]), Number(match[2]), 0).toISOString();
 }

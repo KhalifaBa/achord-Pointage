@@ -5,16 +5,23 @@ import { useTheme } from '../utils/ThemeContext';
 import { radius, spacing } from '../utils/theme';
 import { formatTime } from '../utils/storage';
 
-export default function ActionButton({ label, emoji, color, timestamp, disabled, onPress, isLast = false }) {
+export default function ActionButton({ label, emoji, color, timestamp, disabled, onPress, onLongPress, isLast = false }) {
   const { colors } = useTheme();
-  const done     = !!timestamp;
-  const inactive = disabled && !done;
+  const done     = !!timestamp;   // pointage déjà enregistré
+  const inactive = disabled && !done; // pas encore accessible (dépendance non remplie)
+
+  // Appui simple : uniquement si pas encore fait ET pas inactif
+  const handlePress = done ? undefined : (inactive ? undefined : onPress);
+  // Appui long : uniquement si déjà fait (pour modifier)
+  const handleLongPress = done ? onLongPress : undefined;
 
   return (
     <TouchableOpacity
       activeOpacity={0.75}
-      onPress={onPress}
-      disabled={disabled}
+      onPress={handlePress}
+      onLongPress={handleLongPress}
+      delayLongPress={400}
+      disabled={!handlePress && !handleLongPress}
       style={[
         styles.container,
         { borderColor: done ? color : inactive ? colors.border : color + '55', backgroundColor: colors.bgCard },
@@ -34,9 +41,15 @@ export default function ActionButton({ label, emoji, color, timestamp, disabled,
             {label}
           </Text>
         </View>
-        <Text style={[styles.time, { color: done ? color : colors.textMuted }]}>
-          {done ? formatTime(timestamp) : '--:--'}
-        </Text>
+        <View style={styles.rightSide}>
+          <Text style={[styles.time, { color: done ? color : colors.textMuted }]}>
+            {done ? formatTime(timestamp) : '--:--'}
+          </Text>
+          {/* Icône crayon visible uniquement quand modifiable */}
+          {done && onLongPress && (
+            <Text style={[styles.editHint, { color: colors.textMuted }]}>✏️</Text>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -50,5 +63,7 @@ const styles = StyleSheet.create({
   labelWrap:   { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   emoji:       { fontSize: 18 },
   label:       { fontSize: 15, fontWeight: '500', letterSpacing: 0.2 },
+  rightSide:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
   time:        { fontSize: 17, fontWeight: '700', fontFamily: 'Courier New', letterSpacing: 1 },
+  editHint:    { fontSize: 12, opacity: 0.5 },
 });

@@ -23,6 +23,8 @@ export default function SettingsScreen() {
   const [emailjsServiceId,   setEmailjsServiceId]   = useState('');
   const [emailjsTemplateId,  setEmailjsTemplateId]  = useState('');
   const [emailjsPublicKey,   setEmailjsPublicKey]   = useState('');
+  const [expectedArrival,    setExpectedArrival]    = useState('09:00');
+  const [expectedDeparture,  setExpectedDeparture]  = useState('18:00');
   const [saved, setSaved] = useState(false);
 
   useFocusEffect(
@@ -36,6 +38,8 @@ export default function SettingsScreen() {
         setEmailjsServiceId(s.emailjsServiceId   || '');
         setEmailjsTemplateId(s.emailjsTemplateId || '');
         setEmailjsPublicKey(s.emailjsPublicKey   || '');
+        setExpectedArrival(s.expectedArrival     || '09:00');
+        setExpectedDeparture(s.expectedDeparture || '18:00');
       });
       setSaved(false);
     }, [])
@@ -59,6 +63,8 @@ export default function SettingsScreen() {
       emailjsServiceId:  emailjsServiceId.trim(),
       emailjsTemplateId: emailjsTemplateId.trim(),
       emailjsPublicKey:  emailjsPublicKey.trim(),
+      expectedArrival:   expectedArrival.trim() || '09:00',
+      expectedDeparture: expectedDeparture.trim() || '18:00',
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -152,6 +158,29 @@ export default function SettingsScreen() {
                 colors={colors} mono />
             </View>
           )}
+
+          {/* ══════════════════════════════════════════
+              HORAIRE CONTRACTUEL
+          ══════════════════════════════════════════ */}
+          <SectionTitle label="HORAIRE CONTRACTUEL" colors={colors} />
+
+          <View style={[s.serviceBlock, { marginBottom: spacing.md }]}>
+            <Text style={s.serviceHint}>
+              Ces heures servent à calculer vos avances et retards affichés dans la barre de résumé. Elles ne sont pas transmises par mail.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <Field label="Arrivée théorique" placeholder="09:00"
+                  value={expectedArrival} onChangeText={setExpectedArrival}
+                  keyboardType="numbers-and-punctuation" colors={colors} mono />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Field label="Départ théorique" placeholder="18:00"
+                  value={expectedDeparture} onChangeText={setExpectedDeparture}
+                  keyboardType="numbers-and-punctuation" colors={colors} mono />
+              </View>
+            </View>
+          </View>
 
           {/* ══════════════════════════════════════════
               THÈME

@@ -50,6 +50,17 @@ export function useTimings() {
   }, [timings, dateStr]);
 
   /**
+   * Modifie manuellement l'heure d'un pointage existant ou futur.
+   * @param {string} key  - ex: 'arrival'
+   * @param {string} iso  - ISO string de la nouvelle valeur
+   */
+  const editTiming = useCallback(async (key, iso) => {
+    const updated = { ...timings, [key]: iso };
+    setTimings(updated);
+    await saveTimings(dateStr, updated);
+  }, [timings, dateStr]);
+
+  /**
    * Réinitialise tous les pointages du jour.
    */
   const reset = useCallback(async () => {
@@ -58,5 +69,5 @@ export function useTimings() {
     await saveTimings(dateStr, fresh);
   }, [dateStr]);
 
-  return { timings, dateStr, loading, stamp, reset };
+  return { timings, dateStr, loading, stamp, editTiming, reset };
 }
