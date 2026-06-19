@@ -34,7 +34,7 @@ export async function loadSettings() {
     emailjsServiceId:  '',
     emailjsTemplateId: '',
     emailjsPublicKey:  '',
-    expectedArrival:   '09:00', // Heure d'arrivée contractuelle (HH:mm)
+    expectedArrival:   '09:30', // Heure d'arrivée contractuelle (HH:mm)
     expectedDeparture: '18:00', // Heure de départ contractuelle (HH:mm)
   };
 }
