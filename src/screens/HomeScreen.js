@@ -32,10 +32,10 @@ const KEY_LABELS = {
 
 // Messages d'avertissement contextuels avant validation
 const WARNINGS = {
-  arrival:         { icon: '✅', title: "Confirmer l'arrivée", hint: "Vous êtes bien arrivé(e) au bureau ?" },
+  arrival:         { icon: '✅', title: "Confirmer l'arrivée", hint: 'Vous êtes bien arrivé(e) au bureau ?' },
   coffeeMornStart: { icon: '☕', title: 'Début pause café', hint: 'Vous prenez votre pause café du matin ?' },
   coffeeMornEnd:   { icon: '☕', title: 'Fin pause café', hint: 'Vous reprenez le travail ?' },
-  lunchStart:      { icon: '🍽️', title: 'Début déjeuner', hint: 'Vous partez déjeuner ?' },
+  lunchStart:      { icon: '🍽️', title: 'Début déjeuner', hint: `Vous partez déjeuner ?\n⚖️ Rappel : ${LUNCH_MIN_MINUTES} min minimum obligatoires.` },
   lunchEnd:        { icon: '🍽️', title: 'Fin déjeuner', hint: 'Vous reprenez après le déjeuner ?' },
   coffeeAftnStart: { icon: '☕', title: 'Début pause café AM', hint: "Vous prenez votre pause de l'après-midi ?" },
   coffeeAftnEnd:   { icon: '☕', title: 'Fin pause café AM', hint: 'Vous reprenez le travail ?' },
@@ -80,18 +80,16 @@ export default function HomeScreen({ navigation }) {
     setShowConfirmModal(false);
     if (!pendingKey) return;
 
-    // Vérification spéciale fin déjeuner : durée minimum légale
+    // Vérification stricte fin déjeuner : durée minimum légale obligatoire, non contournable
     if (pendingKey === 'lunchEnd' && lunchStart) {
       const nowIso = new Date().toISOString();
       const mins = Math.round((new Date(nowIso) - new Date(lunchStart)) / 60000);
       if (mins < LUNCH_MIN_MINUTES) {
+        const remaining = LUNCH_MIN_MINUTES - mins;
         Alert.alert(
-          '⚠️ Pause trop courte',
-          `La durée légale minimale de pause déjeuner est de ${LUNCH_MIN_MINUTES} minutes.\nDurée actuelle : ${mins} min.\n\nVoulez-vous quand même valider ?`,
-          [
-            { text: 'Attendre', style: 'cancel' },
-            { text: 'Valider quand même', style: 'destructive', onPress: () => stamp(pendingKey) },
-          ]
+          '⛔ Pause trop courte',
+          `La pause déjeuner doit durer au minimum ${LUNCH_MIN_MINUTES} minutes (obligation légale).\nDurée actuelle : ${mins} min.\nPatientez encore ${remaining} min avant de valider.`,
+          [{ text: 'Compris', style: 'default' }]
         );
         return;
       }
@@ -171,6 +169,21 @@ export default function HomeScreen({ navigation }) {
       setEditError('Format invalide. Utilisez HH:mm (ex : 08:45)');
       return;
     }
+
+    // Validation stricte de la durée légale de pause déjeuner.
+    // On simule le nouveau couple lunchStart/lunchEnd avec la modif en cours.
+    if (editKey === 'lunchStart' || editKey === 'lunchEnd') {
+      const simulatedStart = editKey === 'lunchStart' ? iso : lunchStart;
+      const simulatedEnd   = editKey === 'lunchEnd'   ? iso : lunchEnd;
+      if (simulatedStart && simulatedEnd) {
+        const { ok, minutes } = lunchCheck(simulatedStart, simulatedEnd);
+        if (!ok) {
+          setEditError(`Refusé : pause déjeuner de ${minutes} min < minimum légal de ${LUNCH_MIN_MINUTES} min.`);
+          return;
+        }
+      }
+    }
+
     await editTiming(editKey, iso);
     setShowEditModal(false);
   };

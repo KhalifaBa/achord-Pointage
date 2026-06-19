@@ -23,7 +23,7 @@ export default function SettingsScreen() {
   const [emailjsServiceId,   setEmailjsServiceId]   = useState('');
   const [emailjsTemplateId,  setEmailjsTemplateId]  = useState('');
   const [emailjsPublicKey,   setEmailjsPublicKey]   = useState('');
-  const [expectedArrival,    setExpectedArrival]    = useState('09:30');
+  const [expectedArrival,    setExpectedArrival]    = useState('09:00');
   const [expectedDeparture,  setExpectedDeparture]  = useState('18:00');
   const [saved, setSaved] = useState(false);
 
@@ -38,7 +38,7 @@ export default function SettingsScreen() {
         setEmailjsServiceId(s.emailjsServiceId   || '');
         setEmailjsTemplateId(s.emailjsTemplateId || '');
         setEmailjsPublicKey(s.emailjsPublicKey   || '');
-        setExpectedArrival(s.expectedArrival     || '09:30');
+        setExpectedArrival(s.expectedArrival     || '09:00');
         setExpectedDeparture(s.expectedDeparture || '18:00');
       });
       setSaved(false);
@@ -63,7 +63,7 @@ export default function SettingsScreen() {
       emailjsServiceId:  emailjsServiceId.trim(),
       emailjsTemplateId: emailjsTemplateId.trim(),
       emailjsPublicKey:  emailjsPublicKey.trim(),
-      expectedArrival:   expectedArrival.trim() || '09:30',
+      expectedArrival:   expectedArrival.trim() || '09:00',
       expectedDeparture: expectedDeparture.trim() || '18:00',
     });
     setSaved(true);
@@ -170,7 +170,7 @@ export default function SettingsScreen() {
             </Text>
             <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <View style={{ flex: 1 }}>
-                <Field label="Arrivée théorique" placeholder="09:30"
+                <Field label="Arrivée théorique" placeholder="09:00"
                   value={expectedArrival} onChangeText={setExpectedArrival}
                   keyboardType="numbers-and-punctuation" colors={colors} mono />
               </View>
