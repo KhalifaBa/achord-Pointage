@@ -25,6 +25,7 @@ export default function SettingsScreen() {
   const [emailjsPublicKey,   setEmailjsPublicKey]   = useState('');
   const [expectedArrival,    setExpectedArrival]    = useState('09:30');
   const [expectedDeparture,  setExpectedDeparture]  = useState('18:00');
+  const [location,           setLocation]           = useState('');
   const [saved, setSaved] = useState(false);
 
   useFocusEffect(
@@ -40,6 +41,7 @@ export default function SettingsScreen() {
         setEmailjsPublicKey(s.emailjsPublicKey   || '');
         setExpectedArrival(s.expectedArrival     || '09:30');
         setExpectedDeparture(s.expectedDeparture || '18:00');
+        setLocation(s.location || '');
       });
       setSaved(false);
     }, [])
@@ -48,10 +50,6 @@ export default function SettingsScreen() {
   const handleSave = async () => {
     if (!employeeName.trim()) {
       Alert.alert('Champ requis', 'Veuillez saisir votre nom.');
-      return;
-    }
-    if (!recipientEmail.trim()) {
-      Alert.alert('Champ requis', "Veuillez saisir l'email du destinataire.");
       return;
     }
     await saveSettings({
@@ -65,6 +63,7 @@ export default function SettingsScreen() {
       emailjsPublicKey:  emailjsPublicKey.trim(),
       expectedArrival:   expectedArrival.trim() || '09:30',
       expectedDeparture: expectedDeparture.trim() || '18:00',
+      location:          location.trim(),
     });
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
@@ -86,13 +85,17 @@ export default function SettingsScreen() {
             value={employeeName} onChangeText={setEmployeeName}
             autoCapitalize="words" colors={colors} />
 
-          <Field label="Email destinataire (RH / manager) *" placeholder="rh@entreprise.com"
+          <Field label="Email destinataire (RH / manager)" placeholder="rh@entreprise.com"
             value={recipientEmail} onChangeText={setRecipientEmail}
             keyboardType="email-address" colors={colors} />
 
           <Field label="Votre email (expéditeur)" placeholder="vous@entreprise.com"
             value={senderEmail} onChangeText={setSenderEmail}
             keyboardType="email-address" colors={colors} />
+
+          <Field label="Lieu de travail (export Excel)" placeholder="ex : Bureau de Champ"
+            value={location} onChangeText={setLocation}
+            autoCapitalize="sentences" colors={colors} />
 
           {/* ══════════════════════════════════════════
               SERVICE D'ENVOI

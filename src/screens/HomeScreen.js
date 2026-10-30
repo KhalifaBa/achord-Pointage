@@ -99,18 +99,8 @@ export default function HomeScreen({ navigation }) {
   };
 
   // ── Départ ────────────────────────────────────────────────────────────
+  // Le départ ne fait QUE pointer. Le mail est un bouton à part (voir handleSendMail).
   const handleDeparturePress = () => {
-    if (!settings?.employeeName || !settings?.recipientEmail) {
-      Alert.alert('Paramètres manquants', "Configurez votre nom et l'email destinataire dans ⚙️ Paramètres.",
-        [{ text: 'Annuler', style: 'cancel' }, { text: 'Paramètres', onPress: () => navigation.navigate('Settings') }]);
-      return;
-    }
-    if (!settings?.emailService) {
-      Alert.alert('Service mail non configuré', "Choisissez Brevo ou EmailJS dans ⚙️ Paramètres.",
-        [{ text: 'Annuler', style: 'cancel' }, { text: 'Paramètres', onPress: () => navigation.navigate('Settings') }]);
-      return;
-    }
-
     // Avertissement pause déj si non prise ou trop courte
     const lunch = lunchCheck(lunchStart, lunchEnd);
     if (!lunchStart) {
@@ -141,13 +131,21 @@ export default function HomeScreen({ navigation }) {
 
   const confirmDeparture = async () => {
     setShowDepartModal(false);
-    setSending(true);
-    const departureISO   = new Date().toISOString();
     await stamp('departure');
-    const updatedTimings = { ...timings, departure: departureISO };
-    const result = await sendTimingEmail({ dateStr, timings: updatedTimings, settings });
+  };
+
+  // ── Mail (séparé du départ) ───────────────────────────────────────────
+  const handleSendMail = async () => {
+    if (!settings?.employeeName || !settings?.recipientEmail || !settings?.emailService) {
+      Alert.alert('Mail non configuré', "Renseignez votre nom, le destinataire et le service mail dans ⚙️ Paramètres.",
+        [{ text: 'Annuler', style: 'cancel' }, { text: 'Paramètres', onPress: () => navigation.navigate('Settings') }]);
+      return;
+    }
+    setSending(true);
+    const result = await sendTimingEmail({ dateStr, timings, settings });
     setSending(false);
     if (result.success) {
+      await editTiming('mailSentAt', new Date().toISOString());
       Alert.alert('✅ Mail envoyé', 'Le récapitulatif de pointage a bien été envoyé.');
     } else {
       Alert.alert("Erreur d'envoi", result.error || 'Une erreur est survenue.');
@@ -238,14 +236,14 @@ export default function HomeScreen({ navigation }) {
               <MRow label="Travail net" value={formatDuration(previewSummary.effectiveWork)} color={colors.success} colors={colors} bold />
             </View>
 
-            <Text style={[styles.modalHint, { color: colors.textMuted }]}>Le mail sera envoyé automatiquement via {settings?.emailService === 'brevo' ? 'Brevo' : 'EmailJS'}.</Text>
+            <Text style={[styles.modalHint, { color: colors.textMuted }]}>Aucun mail n'est envoyé ici. Tu pourras l'envoyer ensuite avec le bouton 📧.</Text>
 
             <View style={styles.modalBtns}>
               <TouchableOpacity style={[styles.btnCancel, { borderColor: colors.border }]} onPress={() => setShowDepartModal(false)}>
                 <Text style={[styles.btnCancelTxt, { color: colors.textSecondary }]}>Annuler</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.btnConfirm, { backgroundColor: colors.departure }]} onPress={confirmDeparture}>
-                <Text style={styles.btnConfirmTxt}>Confirmer & Envoyer</Text>
+                <Text style={styles.btnConfirmTxt}>Confirmer le départ</Text>
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -348,13 +346,23 @@ export default function HomeScreen({ navigation }) {
         <ActionButton emoji="☕" label="Fin pause café"    color={colors.coffeeAftn} timestamp={coffeeAftnEnd}   disabled={!coffeeAftnStart || !!coffeeAftnEnd}  onPress={() => handleStamp('coffeeAftnEnd')}   onLongPress={() => openEdit('coffeeAftnEnd')} />
 
         <SLabel label="FIN DE JOURNÉE" colors={colors} />
+        <ActionButton emoji="🚪" label="Départ" color={colors.departure} timestamp={departure} disabled={!arrival || !!departure} onPress={() => handleStamp('departure')} onLongPress={() => openEdit('departure')} />
         {sending ? (
-          <View style={[styles.sendingBox, { borderColor: colors.departure + '44', backgroundColor: colors.bgCard }]}>
-            <ActivityIndicator color={colors.departure} />
+          <View style={[styles.sendingBox, { borderColor: colors.accent + '44', backgroundColor: colors.bgCard }]}>
+            <ActivityIndicator color={colors.accent} />
             <Text style={[styles.sendingText, { color: colors.textSecondary }]}>Envoi du mail en cours…</Text>
           </View>
         ) : (
-          <ActionButton emoji="🚪" label="Départ — Envoyer le mail" color={colors.departure} timestamp={departure} disabled={!arrival || !!departure} onPress={() => handleStamp('departure')} onLongPress={() => openEdit('departure')} isLast />
+          <ActionButton
+            emoji="📧"
+            label={timings.mailSentAt ? 'Renvoyer le mail' : 'Envoyer le mail'}
+            color={colors.accent}
+            timestamp={timings.mailSentAt}
+            disabled={!departure}
+            onPress={handleSendMail}
+            allowRepeat
+            isLast
+          />
         )}
 
         {/* Hint édition */}

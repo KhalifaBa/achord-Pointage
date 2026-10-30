@@ -5,6 +5,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
+export const HISTORY_MAX_DAYS = 400;
+
 const KEYS = {
   SETTINGS:       'settings',
   TIMINGS_PREFIX: 'timings_',
@@ -36,6 +38,7 @@ export async function loadSettings() {
     emailjsPublicKey:  '',
     expectedArrival:   '09:30', // Heure d'arrivée contractuelle (HH:mm)
     expectedDeparture: '18:00', // Heure de départ contractuelle (HH:mm)
+    location:          '',      // Colonne « Localisation » de l'export Excel
   };
 }
 
@@ -64,7 +67,8 @@ export async function saveTimings(dateStr, timings) {
   await AsyncStorage.setItem(dateKey(dateStr), JSON.stringify(timings));
   const index = await loadHistoryIndex();
   if (!index.includes(dateStr)) {
-    const updated = [dateStr, ...index].slice(0, 30);
+    // On garde ~1 an d'historique : nécessaire pour l'export mensuel (et le repos du 1er jour du mois)
+    const updated = [dateStr, ...index].sort().reverse().slice(0, HISTORY_MAX_DAYS);
     await AsyncStorage.setItem(KEYS.HISTORY_INDEX, JSON.stringify(updated));
   }
 }
@@ -79,8 +83,8 @@ export async function loadHistoryIndex() {
   return raw ? JSON.parse(raw) : [];
 }
 
-export async function loadAllHistory() {
-  const index = await loadHistoryIndex();
+export async function loadAllHistory(limit = 30) {
+  const index = (await loadHistoryIndex()).slice(0, limit);
   const entries = await Promise.all(
     index.map(async (dateStr) => ({
       dateStr,

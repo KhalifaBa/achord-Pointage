@@ -10,7 +10,8 @@ Remplace l'envoi manuel de mails de pointage quotidien.
 
 - **8 boutons de pointage** chronologiques (arrivée, pauses, départ)
 - **Désactivation automatique** après chaque action (pas de doublons)
-- **Envoi automatique** du mail récapitulatif au départ via le client mail natif
+- **Départ et mail séparés** : « Départ » pointe seulement, « 📧 Envoyer le mail » envoie le récap quand tu veux
+- **Export Suivi Mensuel** (onglet 📊) : importe le fichier Excel du mois, choisis le projet de chaque jour, l'app le remplit (formules, listes et tableau croisé conservés)
 - **Historique 30 jours** consultable et détaillé
 - **Calcul automatique** du temps de travail effectif
 - **Réinitialisation automatique** chaque nouveau jour
@@ -193,3 +194,16 @@ pointage-app/
 
 MIT — libre d'utilisation et de modification.
 # achord-Pointage
+
+---
+
+## 📊 Export « Suivi Mensuel »
+
+1. Onglet **Export** → *Importer le fichier du mois* (le .xlsx reçu).
+2. *Projet pour tout le mois*, puis corrige jour par jour si besoin.
+3. Appui sur les horaires d'un jour pour les corriger (bouton *Horaire type*).
+4. *Générer l'Excel* → fichier `<nom>_rempli.xlsx` à partager.
+
+L'app ne modifie jamais les formules (colonnes H et M) : elle affiche à part les vrais totaux par semaine et signale les écarts.
+
+Test sans téléphone : `node scripts/test-export.mjs "fichier du mois.xlsx" sortie.xlsx`
