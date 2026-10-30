@@ -1,0 +1,39 @@
+# Build Android (APK) avec EAS à chaque push sur main.
+# Prérequis : secret EXPO_TOKEN dans Settings → Secrets and variables → Actions.
+name: EAS Build Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:   # bouton « Run workflow » pour lancer à la main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Vérifier le jeton Expo
+        run: |
+          if [ -z "${{ secrets.EXPO_TOKEN }}" ]; then
+            echo "Le secret EXPO_TOKEN manque (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+
+      - name: Installer EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Installer les dépendances
+        run: npm install --no-audit --no-fund
+
+      - name: Lancer le build APK (profil preview)
+        run: eas build --platform android --profile preview --non-interactive --no-wait
