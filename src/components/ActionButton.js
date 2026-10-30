@@ -5,13 +5,14 @@ import { useTheme } from '../utils/ThemeContext';
 import { radius, spacing } from '../utils/theme';
 import { formatTime } from '../utils/storage';
 
-export default function ActionButton({ label, emoji, color, timestamp, disabled, onPress, onLongPress, isLast = false }) {
+export default function ActionButton({ label, emoji, color, timestamp, disabled, onPress, onLongPress, isLast = false, allowRepeat = false }) {
   const { colors } = useTheme();
   const done     = !!timestamp;   // pointage déjà enregistré
   const inactive = disabled && !done; // pas encore accessible (dépendance non remplie)
 
   // Appui simple : uniquement si pas encore fait ET pas inactif
-  const handlePress = done ? undefined : (inactive ? undefined : onPress);
+  // allowRepeat : le bouton reste cliquable après usage (ex : renvoyer le mail)
+  const handlePress = (done && !allowRepeat) ? undefined : (inactive ? undefined : onPress);
   // Appui long : uniquement si déjà fait (pour modifier)
   const handleLongPress = done ? onLongPress : undefined;
 

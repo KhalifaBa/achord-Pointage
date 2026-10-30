@@ -9,10 +9,11 @@ import { ThemeProvider, useTheme } from './src/utils/ThemeContext';
 import HomeScreen     from './src/screens/HomeScreen';
 import HistoryScreen  from './src/screens/HistoryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import ExportScreen   from './src/screens/ExportScreen';
 import { spacing } from './src/utils/theme';
 
 const Tab = createBottomTabNavigator();
-const icons = { Home: '⏱', History: '📋', Settings: '⚙️' };
+const icons = { Home: '⏱', History: '📋', Export: '📊', Settings: '⚙️' };
 
 function AppNavigator() {
   const { colors, themeKey } = useTheme();
@@ -37,6 +38,7 @@ function AppNavigator() {
         >
           <Tab.Screen name="Home"     component={HomeScreen}     options={{ title: 'Pointage',  headerShown: false }} />
           <Tab.Screen name="History"  component={HistoryScreen}  options={{ title: 'Historique', headerTitle: 'Historique' }} />
+          <Tab.Screen name="Export"   component={ExportScreen}   options={{ title: 'Export', headerShown: false }} />
           <Tab.Screen name="Settings" component={SettingsScreen} options={{ title: 'Paramètres', headerTitle: 'Paramètres' }} />
         </Tab.Navigator>
       </NavigationContainer>
