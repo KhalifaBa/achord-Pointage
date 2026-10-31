@@ -17,7 +17,7 @@ jobs:
       - name: Installer Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Vérifier le jeton Expo
         run: |
@@ -26,14 +26,10 @@ jobs:
             exit 1
           fi
 
-      - name: Installer EAS
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
-
       - name: Installer les dépendances
         run: npm install --no-audit --no-fund
 
       - name: Lancer le build APK (profil preview)
-        run: eas build --platform android --profile preview --non-interactive --no-wait
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx --yes eas-cli@latest build --platform android --profile preview --non-interactive --no-wait
