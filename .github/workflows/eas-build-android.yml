@@ -67,4 +67,4 @@ jobs:
             echo "- [Page du build sur Expo]($PAGE)"
           } >> "$GITHUB_STEP_SUMMARY"
           # Le même QR code, directement dans les logs
-          npx --yes qrcode@1.5.4 -t terminal -s 1 "$APK"
+          npx --yes qrcode@1.5.4 --small "$APK" || true
