@@ -27,6 +27,9 @@
         "projectId": "c3485965-bfa3-4f54-aa8a-4f650faf2c83"
       }
     },
-    "owner": "lek-do"
+    "owner": "lek-do",
+    "plugins": [
+      "expo-notifications"
+    ]
   }
 }

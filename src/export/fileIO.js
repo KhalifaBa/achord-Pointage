@@ -51,6 +51,37 @@ export async function pickXlsx() {
   return { name: asset.name || 'Suivi Mensuel.xlsx', base64 };
 }
 
+/** Choisir un fichier texte (ex : sauvegarde .json). @returns {Promise<{name, text} | null>} */
+export async function pickTextFile(types = ['application/json', 'text/plain', '*/*']) {
+  const res = await DocumentPicker.getDocumentAsync({ type: types, copyToCacheDirectory: true, multiple: false });
+  if (res.canceled || !res.assets?.length) return null;
+  const asset = res.assets[0];
+  const text = Platform.OS === 'web'
+    ? (asset.file ? await asset.file.text() : await (await fetch(asset.uri)).text())
+    : await FileSystem.readAsStringAsync(asset.uri);
+  return { name: asset.name, text };
+}
+
+/** Enregistrer / partager un fichier texte (ex : sauvegarde .json) */
+export async function saveTextAndShare(name, text, mimeType = 'application/json') {
+  if (Platform.OS === 'web') {
+    const blob = new Blob([text], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return;
+  }
+  const uri = FileSystem.cacheDirectory + name.replace(/[\\/:*?"<>|]/g, '_');
+  await FileSystem.writeAsStringAsync(uri, text);
+  if (await Sharing.isAvailableAsync()) {
+    await Sharing.shareAsync(uri, { mimeType, dialogTitle: 'Enregistrer la sauvegarde' });
+  } else {
+    notify('Fichier créé', uri);
+  }
+}
+
 // ─── Enregistrer / partager le fichier rempli ───────────────────────
 
 export async function saveAndShare(name, base64) {
@@ -83,6 +114,14 @@ export async function saveAndShare(name, base64) {
 
 const FILE_KEY = 'suivi_file';
 const projectsKey = (month) => `suivi_projects_${month}`;
+const DEFAULT_PROJECT_KEY = 'suivi_default_project';
+
+export async function loadDefaultProject() {
+  return AsyncStorage.getItem(DEFAULT_PROJECT_KEY);
+}
+export async function saveDefaultProject(project) {
+  await AsyncStorage.setItem(DEFAULT_PROJECT_KEY, project);
+}
 
 export async function saveSuiviFile(file) {
   await AsyncStorage.setItem(FILE_KEY, JSON.stringify(file));

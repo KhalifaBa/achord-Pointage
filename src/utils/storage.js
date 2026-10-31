@@ -39,6 +39,7 @@ export async function loadSettings() {
     expectedArrival:   '09:30', // Heure d'arrivée contractuelle (HH:mm)
     expectedDeparture: '18:00', // Heure de départ contractuelle (HH:mm)
     location:          '',      // Colonne « Localisation » de l'export Excel
+    remindersEnabled:  false,   // Rappels de pointage (notifications locales)
   };
 }
 

@@ -22,6 +22,7 @@ import { readSuivi, fillSuivi, filledName } from '../export/suiviXlsx';
 import {
   pickXlsx, saveAndShare, saveSuiviFile, loadSuiviFile,
   loadMonthProjects, saveMonthProjects, notify, ask,
+  loadDefaultProject, saveDefaultProject,
 } from '../export/fileIO';
 
 const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -81,10 +82,14 @@ export default function ExportScreen({ navigation }) {
     // Jours fériés sans pointage → « Férié » proposé (modifiable)
     const holidays = frenchHolidays(Number(parsed.month.slice(0, 4)));
     const proj = { ...saved };
+    // Projet par défaut (le dernier choisi pour « tout le mois ») → jours pointés sans projet
+    const def = await loadDefaultProject();
+    const defOk = def && parsed.projects.includes(def);
     for (const { dateStr } of parsed.dates) {
-      if (!proj[dateStr] && holidays.has(dateStr) && !storedMap[dateStr]?.arrival && parsed.projects.includes('Férié')) {
-        proj[dateStr] = 'Férié';
-      }
+      if (proj[dateStr]) continue;
+      const worked = !!storedMap[dateStr]?.arrival;
+      if (!worked && holidays.has(dateStr) && parsed.projects.includes('Férié')) proj[dateStr] = 'Férié';
+      else if (worked && defOk) proj[dateStr] = def;
     }
     setFile(f); setInfo(parsed); setStored(storedMap); setProjects(proj);
   }, []);
@@ -158,6 +163,7 @@ export default function ExportScreen({ navigation }) {
   };
 
   const applyBulk = async (value, onlyEmpty) => {
+    if (!ABSENCE_PROJECTS.includes(value) && value !== 'Autres') await saveDefaultProject(value);
     const next = { ...projects };
     for (const { dateStr } of info.dates) {
       if (!onlyEmpty || !next[dateStr]) next[dateStr] = value;
@@ -290,6 +296,9 @@ export default function ExportScreen({ navigation }) {
               <TouchableOpacity onPress={() => setPicker({ ...picker, onlyEmpty: !picker.onlyEmpty })} style={{ marginTop: spacing.md }}>
                 <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
                   {picker.onlyEmpty ? '☑' : '☐'}  Seulement les jours sans projet
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 4 }}>
+                  Ce projet sera aussi mis tout seul sur tes prochains jours pointés.
                 </Text>
               </TouchableOpacity>
             )}

@@ -8,7 +8,10 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { loadSettings, saveSettings } from '../utils/storage';
+import { loadSettings, saveSettings, loadTimings, todayStr } from '../utils/storage';
+import { ensureNotificationPermission, scheduleReminders } from '../utils/reminders';
+import { exportBackup, importBackup } from '../utils/backup';
+import { notify } from '../export/fileIO';
 import { useTheme } from '../utils/ThemeContext';
 import { radius, spacing, themes } from '../utils/theme';
 
@@ -26,6 +29,7 @@ export default function SettingsScreen() {
   const [expectedArrival,    setExpectedArrival]    = useState('09:30');
   const [expectedDeparture,  setExpectedDeparture]  = useState('18:00');
   const [location,           setLocation]           = useState('');
+  const [remindersEnabled,   setRemindersEnabled]   = useState(false);
   const [saved, setSaved] = useState(false);
 
   useFocusEffect(
@@ -42,6 +46,7 @@ export default function SettingsScreen() {
         setExpectedArrival(s.expectedArrival     || '09:30');
         setExpectedDeparture(s.expectedDeparture || '18:00');
         setLocation(s.location || '');
+        setRemindersEnabled(!!s.remindersEnabled);
       });
       setSaved(false);
     }, [])
@@ -52,7 +57,16 @@ export default function SettingsScreen() {
       Alert.alert('Champ requis', 'Veuillez saisir votre nom.');
       return;
     }
-    await saveSettings({
+    let reminders = remindersEnabled;
+    if (reminders && Platform.OS !== 'web') {
+      const ok = await ensureNotificationPermission({ ask: true });
+      if (!ok) {
+        reminders = false;
+        setRemindersEnabled(false);
+        notify('Notifications refusées', "Autorise les notifications de l'app dans les réglages du téléphone pour recevoir les rappels.");
+      }
+    }
+    const newSettings = {
       employeeName:      employeeName.trim(),
       recipientEmail:    recipientEmail.trim(),
       senderEmail:       senderEmail.trim(),
@@ -64,9 +78,34 @@ export default function SettingsScreen() {
       expectedArrival:   expectedArrival.trim() || '09:30',
       expectedDeparture: expectedDeparture.trim() || '18:00',
       location:          location.trim(),
-    });
+      remindersEnabled:  reminders,
+    };
+    await saveSettings(newSettings);
+    const today = todayStr();
+    scheduleReminders({ settings: newSettings, dateStr: today, todayTimings: await loadTimings(today) }).catch(() => {});
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
+  };
+
+  const handleExport = async () => {
+    try {
+      await exportBackup();
+    } catch (e) {
+      notify('Erreur', e.message);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const days = await importBackup();
+      if (days === null) return;
+      notify('✅ Restauré', `${days} jour(s) de pointage restauré(s). Rouvre les onglets pour voir les données.`);
+      const st = await loadSettings();
+      setEmployeeName(st.employeeName || ''); setRecipientEmail(st.recipientEmail || '');
+      setLocation(st.location || ''); setRemindersEnabled(!!st.remindersEnabled);
+    } catch (e) {
+      notify('Restauration impossible', e.message);
+    }
   };
 
   const s = makeStyles(colors);
@@ -182,6 +221,39 @@ export default function SettingsScreen() {
                   value={expectedDeparture} onChangeText={setExpectedDeparture}
                   keyboardType="numbers-and-punctuation" colors={colors} mono />
               </View>
+            </View>
+          </View>
+
+          {/* ══════════════════════════════════════════
+              RAPPELS
+          ══════════════════════════════════════════ */}
+          <SectionTitle label="RAPPELS" colors={colors} />
+          <View style={[s.serviceBlock, { flexDirection: 'row', alignItems: 'center' }]}>
+            <View style={{ flex: 1, paddingRight: spacing.md }}>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textPrimary }}>Me rappeler de pointer</Text>
+              <Text style={[s.serviceHint, { marginBottom: 0 }]}>
+                Arrivée théorique + 10 min et départ + 5 min, du lundi au vendredi. Pas de rappel si c'est déjà pointé.
+              </Text>
+            </View>
+            <Switch value={remindersEnabled} onValueChange={setRemindersEnabled}
+              trackColor={{ true: colors.accent, false: colors.border }} />
+          </View>
+
+          {/* ══════════════════════════════════════════
+              SAUVEGARDE
+          ══════════════════════════════════════════ */}
+          <SectionTitle label="SAUVEGARDE" colors={colors} />
+          <View style={s.serviceBlock}>
+            <Text style={s.serviceHint}>
+              Pour changer de téléphone sans rien perdre. Les clés API ne sont pas incluses.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <TouchableOpacity style={s.backupBtn} onPress={handleExport}>
+                <Text style={s.backupTxt}>💾 Sauvegarder</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.backupBtn} onPress={handleImport}>
+                <Text style={s.backupTxt}>📥 Restaurer</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -343,6 +415,9 @@ function makeStyles(colors) {
       width: 18, height: 18, borderRadius: 9,
       alignItems: 'center', justifyContent: 'center',
     },
+
+    backupBtn: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: spacing.md, alignItems: 'center', backgroundColor: colors.bgInput },
+    backupTxt: { fontSize: 14, fontWeight: '700', color: colors.textPrimary },
 
     saveBtn: {
       backgroundColor: colors.accent,

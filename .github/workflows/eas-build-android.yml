@@ -36,6 +36,9 @@ jobs:
       - name: Installer les dépendances
         run: npm install --no-audit --no-fund
 
+      - name: Tests (si ça casse, pas de build Expo gaspillé)
+        run: npm test
+
       - name: Build APK (attend la fin du build sur Expo)
         id: build
         env:

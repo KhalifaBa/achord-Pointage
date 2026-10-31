@@ -1,5 +1,5 @@
 // src/screens/HomeScreen.js
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, Alert,
   ActivityIndicator, TouchableOpacity, Modal, Pressable, TextInput, KeyboardAvoidingView, Platform,
@@ -17,6 +17,8 @@ import { spacing, radius } from '../utils/theme';
 import ActionButton from '../components/ActionButton';
 import SummaryBar from '../components/SummaryBar';
 import LiveClock from '../components/LiveClock';
+import { scheduleReminders } from '../utils/reminders';
+import { nextQuickStep } from '../utils/quickStep';
 
 // Libellés lisibles pour chaque clé de pointage
 const KEY_LABELS = {
@@ -29,6 +31,18 @@ const KEY_LABELS = {
   coffeeAftnEnd:   '☕ Fin café AM',
   departure:       '🚪 Départ',
 };
+
+// Ordre du « pointage en 1 tap »
+const QUICK_STEPS = {
+  arrival:         { emoji: '✅', label: "Pointer l'arrivée",   color: 'arrival' },
+  coffeeMornEnd:   { emoji: '☕', label: 'Fin de la pause café', color: 'coffeeMorn' },
+  lunchStart:      { emoji: '🍽️', label: 'Partir déjeuner',     color: 'lunch' },
+  lunchEnd:        { emoji: '🍽️', label: 'Retour du déjeuner',  color: 'lunch' },
+  coffeeAftnEnd:   { emoji: '☕', label: 'Fin de la pause café', color: 'coffeeAftn' },
+  departure:       { emoji: '🚪', label: 'Pointer le départ',   color: 'departure' },
+};
+
+const UNDO_MS = 6000;
 
 // Messages d'avertissement contextuels avant validation
 const WARNINGS = {
@@ -62,7 +76,19 @@ export default function HomeScreen({ navigation }) {
   const [editError, setEditError]             = useState('');
   const [showEditModal, setShowEditModal]     = useState(false);
 
+  // Toast « Annuler » après un pointage en 1 tap
+  const [undo, setUndo]                       = useState(null); // { key, label, time }
+  const undoTimer                             = useRef(null);
+
   useFocusEffect(useCallback(() => { loadSettings().then(setSettings); }, []));
+
+  // Rappels : recalculés quand on pointe l'arrivée / le départ ou qu'on change les réglages
+  useEffect(() => {
+    if (!settings || loading) return;
+    scheduleReminders({ settings, dateStr, todayTimings: timings }).catch(() => {});
+  }, [settings, loading, dateStr, timings.arrival, timings.departure]);
+
+  useEffect(() => () => clearTimeout(undoTimer.current), []);
 
   const {
     arrival, coffeeMornStart, coffeeMornEnd,
@@ -76,12 +102,10 @@ export default function HomeScreen({ navigation }) {
     setShowConfirmModal(true);
   };
 
-  const confirmStamp = async () => {
-    setShowConfirmModal(false);
-    if (!pendingKey) return;
-
+  /** Pointe la clé (avec la vérification légale du déjeuner). Retourne l'ISO ou null. */
+  const doStamp = async (key) => {
     // Vérification stricte fin déjeuner : durée minimum légale obligatoire, non contournable
-    if (pendingKey === 'lunchEnd' && lunchStart) {
+    if (key === 'lunchEnd' && lunchStart) {
       const nowIso = new Date().toISOString();
       const mins = Math.round((new Date(nowIso) - new Date(lunchStart)) / 60000);
       if (mins < LUNCH_MIN_MINUTES) {
@@ -91,11 +115,38 @@ export default function HomeScreen({ navigation }) {
           `La pause déjeuner doit durer au minimum ${LUNCH_MIN_MINUTES} minutes (obligation légale).\nDurée actuelle : ${mins} min.\nPatientez encore ${remaining} min avant de valider.`,
           [{ text: 'Compris', style: 'default' }]
         );
-        return;
+        return null;
       }
     }
+    return stamp(key);
+  };
 
-    await stamp(pendingKey);
+  const confirmStamp = async () => {
+    setShowConfirmModal(false);
+    if (!pendingKey) return;
+    await doStamp(pendingKey);
+  };
+
+  const showUndo = (key, iso) => {
+    clearTimeout(undoTimer.current);
+    setUndo({ key, label: KEY_LABELS[key], time: formatTime(iso) });
+    undoTimer.current = setTimeout(() => setUndo(null), UNDO_MS);
+  };
+
+  const undoLast = async () => {
+    if (!undo) return;
+    clearTimeout(undoTimer.current);
+    await editTiming(undo.key, null);
+    setUndo(null);
+  };
+
+  // ── Pointage en 1 tap (sans modal, avec « Annuler ») ──────────────────
+  const quickStamp = async () => {
+    const key = nextQuickStep(timings);
+    if (!key) return;
+    if (key === 'departure') { handleDeparturePress(); return; } // garde le récap de fin de journée
+    const iso = await doStamp(key);
+    if (iso) showUndo(key, iso);
   };
 
   // ── Départ ────────────────────────────────────────────────────────────
@@ -131,7 +182,8 @@ export default function HomeScreen({ navigation }) {
 
   const confirmDeparture = async () => {
     setShowDepartModal(false);
-    await stamp('departure');
+    const iso = await stamp('departure');
+    if (iso) showUndo('departure', iso);
   };
 
   // ── Mail (séparé du départ) ───────────────────────────────────────────
@@ -332,6 +384,14 @@ export default function HomeScreen({ navigation }) {
       {/* ── Boutons ── */}
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: spacing.md }} showsVerticalScrollIndicator={false}>
 
+        <QuickButton
+          stepKey={nextQuickStep(timings)}
+          workLabel={formatDuration(Math.max(0, previewSummary.effectiveWork ?? 0))}
+          doneLabel={formatDuration(computeSummary(timings).effectiveWork)}
+          colors={colors}
+          onPress={quickStamp}
+        />
+
         <SLabel label="MATIN" colors={colors} />
         <ActionButton emoji="✅" label="Arrivée"           color={colors.arrival}    timestamp={arrival}         disabled={!!arrival}                        onPress={() => handleStamp('arrival')}         onLongPress={() => openEdit('arrival')} />
         <ActionButton emoji="☕" label="Début pause café"  color={colors.coffeeMorn} timestamp={coffeeMornStart} disabled={!arrival || !!coffeeMornStart}     onPress={() => handleStamp('coffeeMornStart')} onLongPress={() => openEdit('coffeeMornStart')} />
@@ -373,8 +433,40 @@ export default function HomeScreen({ navigation }) {
         <View style={{ height: spacing.xl }} />
       </ScrollView>
 
+      {undo && (
+        <View style={[styles.toast, { backgroundColor: colors.bgCard, borderColor: colors.accent + '66' }]}>
+          <Text style={[styles.toastTxt, { color: colors.textPrimary }]}>{undo.label} · {undo.time}</Text>
+          <TouchableOpacity onPress={undoLast} style={styles.toastBtn}>
+            <Text style={{ color: colors.accent, fontWeight: '800', fontSize: 14 }}>ANNULER</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <SummaryBar timings={timings} dateStr={dateStr} settings={settings} />
     </SafeAreaView>
+  );
+}
+
+function QuickButton({ stepKey, workLabel, doneLabel, colors, onPress }) {
+  if (!stepKey) {
+    return (
+      <View style={[styles.quick, { borderColor: colors.success + '66', backgroundColor: colors.success + '15' }]}>
+        <Text style={[styles.quickLabel, { color: colors.success }]}>🏁 Journée terminée</Text>
+        <Text style={[styles.quickSub, { color: colors.textSecondary }]}>Travail net : {doneLabel}</Text>
+      </View>
+    );
+  }
+  const step = QUICK_STEPS[stepKey];
+  const color = colors[step.color] || colors.accent;
+  return (
+    <TouchableOpacity activeOpacity={0.8} onPress={onPress}
+      style={[styles.quick, { borderColor: color, backgroundColor: color + '22' }]}>
+      <Text style={styles.quickEmoji}>{step.emoji}</Text>
+      <Text style={[styles.quickLabel, { color }]}>{step.label}</Text>
+      <Text style={[styles.quickSub, { color: colors.textSecondary }]}>
+        {stepKey === 'arrival' ? 'Un appui suffit' : `Travail en cours : ${workLabel}`}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -416,5 +508,12 @@ const styles = StyleSheet.create({
   sendingText:  { fontSize: 14 },
   timeInput:    { width: '100%', borderWidth: 1.5, borderRadius: radius.md, paddingVertical: spacing.md, paddingHorizontal: spacing.lg, fontSize: 32, fontWeight: '800', fontFamily: 'Courier New', textAlign: 'center', letterSpacing: 4, marginBottom: spacing.sm },
   errorText:    { fontSize: 12, marginBottom: spacing.sm },
+  quick:        { borderWidth: 2, borderRadius: radius.xl, paddingVertical: spacing.lg, alignItems: 'center', marginTop: spacing.xs, marginBottom: spacing.sm },
+  quickEmoji:   { fontSize: 34, marginBottom: 4 },
+  quickLabel:   { fontSize: 20, fontWeight: '800', letterSpacing: 0.3 },
+  quickSub:     { fontSize: 12, marginTop: 4 },
+  toast:        { position: 'absolute', left: spacing.md, right: spacing.md, bottom: 130, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: radius.md, paddingVertical: spacing.sm, paddingHorizontal: spacing.md, elevation: 6, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 8 },
+  toastTxt:     { flex: 1, fontSize: 14, fontWeight: '600' },
+  toastBtn:     { paddingVertical: 6, paddingHorizontal: spacing.sm },
   editHint:     { fontSize: 10, textAlign: 'center', letterSpacing: 0.5, marginTop: spacing.sm, opacity: 0.6 },
 });
