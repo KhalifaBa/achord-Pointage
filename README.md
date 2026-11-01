@@ -207,3 +207,13 @@ MIT — libre d'utilisation et de modification.
 L'app ne modifie jamais les formules (colonnes H et M) : elle affiche à part les vrais totaux par semaine et signale les écarts.
 
 Test sans téléphone : `node scripts/test-export.mjs "fichier du mois.xlsx" sortie.xlsx`
+
+---
+
+## 🍏 Tester sur iPhone avec Expo Go (gratuit)
+
+1. Sur l'iPhone : installer **Expo Go** depuis l'App Store.
+2. Sur le PC : `npm install` puis `npx expo start --tunnel`
+3. Scanner le QR code avec l'appareil photo de l'iPhone.
+
+Le projet est en **SDK 54**, la version d'Expo Go disponible sur l'App Store.
