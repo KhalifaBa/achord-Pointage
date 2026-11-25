@@ -19,15 +19,23 @@ import {
   dayNumber, dateStrFromDayNumber, weekdayIndex, frenchHolidays, ABSENCE_PROJECTS,
 } from '../export/monthModel';
 import { readSuivi, fillSuivi, filledName } from '../export/suiviXlsx';
+import { buildSuivi, buildName, monthInfo } from '../export/buildSuivi';
 import {
   pickXlsx, saveAndShare, saveSuiviFile, loadSuiviFile,
   loadMonthProjects, saveMonthProjects, notify, ask,
   loadDefaultProject, saveDefaultProject,
+  loadGeneratedMonth, saveGeneratedMonth, clearGeneratedMonth,
 } from '../export/fileIO';
 
 const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const shortDate = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+/** Mois en cours, au format « 2026-11 ». */
+const thisMonth = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
 
 /** Horaires stockés (ISO) → minutes pour le calcul */
 function toMinutesDay(t) {
@@ -64,11 +72,12 @@ export default function ExportScreen({ navigation }) {
   const [editError, setEditError] = useState('');
 
   // ── Chargement ──
-  const loadAll = useCallback(async (f) => {
+  const loadAll = useCallback(async (f, genMonth) => {
     const st = await loadSettings();
     setSettings(st);
-    if (!f) { setFile(null); setInfo(null); return; }
-    const parsed = await readSuivi(f.base64);
+    if (!f && !genMonth) { setFile(null); setInfo(null); return; }
+    // Soit le fichier de l'entreprise, soit un mois que l'app crée elle-même
+    const parsed = f ? await readSuivi(f.base64) : monthInfo(genMonth);
     const first = parsed.dates[0].dateStr;
     // Les 7 jours avant le mois servent à vérifier les repos du début de mois
     const dates = [
@@ -91,7 +100,7 @@ export default function ExportScreen({ navigation }) {
       if (!worked && holidays.has(dateStr) && parsed.projects.includes('Férié')) proj[dateStr] = 'Férié';
       else if (worked && defOk) proj[dateStr] = def;
     }
-    setFile(f); setInfo(parsed); setStored(storedMap); setProjects(proj);
+    setFile(f || null); setInfo(parsed); setStored(storedMap); setProjects(proj);
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -99,7 +108,8 @@ export default function ExportScreen({ navigation }) {
     (async () => {
       try {
         const f = await loadSuiviFile();
-        if (alive) await loadAll(f);
+        const gen = f ? null : await loadGeneratedMonth();
+        if (alive) await loadAll(f, gen);
       } catch (e) {
         notify('Erreur', e.message);
       } finally {
@@ -147,6 +157,7 @@ export default function ExportScreen({ navigation }) {
       if (!f) return;
       setBusy(true);
       await readSuivi(f.base64);          // vérifie que c'est bien un Suivi Mensuel
+      await clearGeneratedMonth();
       await saveSuiviFile(f);
       await loadAll(f);
     } catch (e) {
@@ -154,6 +165,26 @@ export default function ExportScreen({ navigation }) {
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Créer le fichier du mois sans modèle : l'app le fabrique au bon format. */
+  const createMonth = async (month) => {
+    try {
+      setBusy(true);
+      await saveGeneratedMonth(month);
+      await loadAll(null, month);
+    } catch (e) {
+      notify('Erreur', e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Mois précédent / suivant, uniquement en mode « créé par l'app ». */
+  const shiftMonth = async (delta) => {
+    const [yy, mm] = info.month.split('-').map(Number);
+    const n = (yy * 12 + (mm - 1)) + delta;
+    await createMonth(`${Math.floor(n / 12)}-${String((n % 12) + 1).padStart(2, '0')}`);
   };
 
   const setProject = async (dateStr, value) => {
@@ -231,8 +262,12 @@ export default function ExportScreen({ navigation }) {
     }
     try {
       setBusy(true);
-      const out = await fillSuivi(file.base64, month.rows, { location });
-      await saveAndShare(filledName(file.name), out);
+      // Fichier créé par l'app, ou modèle de l'entreprise rempli
+      const out = info.generated
+        ? await buildSuivi(month.rows, { location, projects: info.projects })
+        : await fillSuivi(file.base64, month.rows, { location });
+      const name = info.generated ? buildName(info.month) : filledName(file.name);
+      await saveAndShare(name, out);
     } catch (e) {
       notify('Erreur pendant la génération', e.message);
     } finally {
@@ -251,9 +286,12 @@ export default function ExportScreen({ navigation }) {
         <View style={s.center}>
           <Text style={{ fontSize: 48, marginBottom: spacing.md }}>📊</Text>
           <Text style={s.emptyTitle}>Suivi mensuel</Text>
-          <Text style={s.emptyText}>Importe le fichier Excel du mois.{'\n'}L'app le remplit avec tes pointages.</Text>
-          <TouchableOpacity style={s.primaryBtn} onPress={importFile} disabled={busy}>
-            {busy ? <ActivityIndicator color={colors.bg} /> : <Text style={s.primaryTxt}>📂  Importer le fichier du mois</Text>}
+          <Text style={s.emptyText}>L'app crée le fichier Excel au format de l'entreprise,{'\n'}rempli avec tes pointages.</Text>
+          <TouchableOpacity style={s.primaryBtn} onPress={() => createMonth(thisMonth())} disabled={busy}>
+            {busy ? <ActivityIndicator color={colors.bg} /> : <Text style={s.primaryTxt}>📊  Créer le fichier de {MONTHS[new Date().getMonth()]}</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.smallBtn, { marginTop: spacing.md }]} onPress={importFile} disabled={busy}>
+            <Text style={s.smallTxt}>📂 Partir d'un fichier existant</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -347,10 +385,22 @@ export default function ExportScreen({ navigation }) {
       <View style={s.header}>
         <Text style={s.tag}>SUIVI MENSUEL</Text>
         <Text style={s.headerTitle}>{MONTHS[m - 1]} {y}</Text>
-        <Text style={s.headerSub} numberOfLines={1}>{file.name}</Text>
+        <Text style={s.headerSub} numberOfLines={1}>
+          {info.generated ? `Créé par l'app · ${buildName(info.month)}` : file.name}
+        </Text>
         <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+          {info.generated && (
+            <>
+              <TouchableOpacity style={s.smallBtn} onPress={() => shiftMonth(-1)} disabled={busy}>
+                <Text style={s.smallTxt}>‹ Mois</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.smallBtn} onPress={() => shiftMonth(1)} disabled={busy}>
+                <Text style={s.smallTxt}>Mois ›</Text>
+              </TouchableOpacity>
+            </>
+          )}
           <TouchableOpacity style={s.smallBtn} onPress={importFile}>
-            <Text style={s.smallTxt}>📂 Autre fichier</Text>
+            <Text style={s.smallTxt}>📂 {info.generated ? 'Fichier' : 'Autre fichier'}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.smallBtn} onPress={() => setPicker({ mode: 'bulk', onlyEmpty: true })}>
             <Text style={s.smallTxt}>📌 Projet pour tout le mois</Text>

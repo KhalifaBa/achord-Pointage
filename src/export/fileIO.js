@@ -130,6 +130,22 @@ export async function loadSuiviFile() {
   const raw = await AsyncStorage.getItem(FILE_KEY);
   return raw ? JSON.parse(raw) : null;
 }
+
+// ─── Mois créé par l'app (sans modèle importé) ──────────────────────
+
+const GENERATED_KEY = 'suivi_generated_month';
+
+/** @returns {Promise<string|null>} « 2026-11 » */
+export async function loadGeneratedMonth() {
+  return AsyncStorage.getItem(GENERATED_KEY);
+}
+export async function saveGeneratedMonth(month) {
+  await AsyncStorage.setItem(GENERATED_KEY, month);
+  await AsyncStorage.removeItem(FILE_KEY); // les deux modes s'excluent
+}
+export async function clearGeneratedMonth() {
+  await AsyncStorage.removeItem(GENERATED_KEY);
+}
 export async function loadMonthProjects(month) {
   const raw = await AsyncStorage.getItem(projectsKey(month));
   return raw ? JSON.parse(raw) : {};
