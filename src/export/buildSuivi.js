@@ -327,9 +327,9 @@ const WORKBOOK_RELS = `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlfo
 export async function buildSuivi(rows, { location = '', projects } = {}) {
   if (!rows || !rows.length) throw new Error('Aucun jour à exporter pour ce mois.');
 
-  // Projets du mois d'abord, puis la liste de référence, sans doublon
+  // Liste de référence dans son ordre d'origine, puis tout projet en plus
   const used = rows.map((r) => r.project).filter(Boolean);
-  const list = [...new Set([...used, ...(projects || DEFAULT_PROJECTS)])];
+  const list = [...new Set([...(projects || DEFAULT_PROJECTS), ...used])];
 
   const zip = new JSZip();
   zip.file('[Content_Types].xml', CONTENT_TYPES);

@@ -5,8 +5,8 @@ import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import JSZip from 'jszip';
-import { buildSuivi, buildName, weekTotalRows, monthInfo } from '../src/export/buildSuivi.js';
-import { computeMonth, weekdayIndex, formatHours } from '../src/export/monthModel.js';
+import { buildSuivi, buildName, weekTotalRows, monthInfo, DEFAULT_PROJECTS } from '../src/export/buildSuivi.js';
+import { computeMonth, weekdayIndex, formatHours, ABSENCE_PROJECTS } from '../src/export/monthModel.js';
 
 // Sans argument, on écrit dans le dossier temporaire : npm test ne salit rien.
 const output = process.argv[2] || path.join(os.tmpdir(), 'test-genere.xlsx');
@@ -89,6 +89,37 @@ assert.deepEqual(info.dates.map((d) => d.dateStr), days, 'mêmes jours ouvrés')
 assert.deepEqual(info.dates.map((d) => d.row), reread.dates.map((d) => d.row), 'mêmes numéros de ligne');
 assert.deepEqual(info.weekFormulas.map((w) => w.cell), ['M7', 'M12', 'M17', 'M22']);
 assert.ok(info.projects.includes('Férié'), 'liste de projets fournie');
+
+// ── Liste des projets : valeurs exactes, ordre compris ──
+// L'espace final de « Outils Webservices » est invisible mais compte :
+// c'est la valeur attendue par le fichier de l'entreprise.
+assert.deepEqual(DEFAULT_PROJECTS, [
+  'VirtualBuro Front',
+  'VirtualBuro Back',
+  'Livindeco/Outils Gestion Produits',
+  'Livindeco/Plateforme Web',
+  'Livindeco/Gestion Technique Serveur (Veille, Surveillance, Logs)',
+  'Financial Data History/Outils Webservices ',
+  'Financial Data History/Plateforme Web',
+  'Financial Data History/API',
+  'Backbone Web/Maintenance',
+  'CP',
+  'Arrêt Maladie',
+  'Congés sans solde',
+  'Férié',
+  'Autres',
+]);
+assert.ok(DEFAULT_PROJECTS[5].endsWith(' '), 'espace final conservé');
+for (const p of ABSENCE_PROJECTS) {
+  assert.ok(DEFAULT_PROJECTS.includes(p), `absence « ${p} » proposée dans la liste`);
+}
+
+// L'onglet Données doit reprendre la liste dans cet ordre
+const donnees = await (await JSZip.loadAsync(b64, { base64: true }))
+  .file('xl/worksheets/sheet2.xml').async('string');
+const ecrits = [...donnees.matchAll(/<t xml:space="preserve">([\s\S]*?)<\/t>/g)]
+  .map((m) => m[1]).slice(2); // on saute les en-têtes « Jour » et « Contenu »
+assert.deepEqual(ecrits.slice(0, DEFAULT_PROJECTS.length), DEFAULT_PROJECTS, 'onglet Données : ordre d\'origine');
 
 // Février 2028 (bissextile, commence un mardi) : pas de week-end, lignes à la suite
 const fev = monthInfo('2028-02');
