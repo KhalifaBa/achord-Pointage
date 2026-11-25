@@ -215,9 +215,17 @@ function suiviSheet(rows, location) {
   });
 
   const last = rows.length + 1;
-  // Listes déroulantes « Oui / Non » sur les trois colonnes de contrôle
+  // Deux listes déroulantes :
+  //  - « Oui / Non » sur les colonnes de contrôle (comme le modèle)
+  //  - les projets sur la colonne B. La liste dépasse les 255 caractères
+  //    permis pour une liste écrite en dur, donc elle pointe vers le nom
+  //    défini « Projets » (= onglet Données). On laisse showErrorMessage à 0 :
+  //    le menu aide la saisie sans interdire d'écrire autre chose.
   const validation = rows.length
-    ? `<dataValidations count="1"><dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="D2:F${last}"><formula1>"Oui,Non"</formula1></dataValidation></dataValidations>`
+    ? '<dataValidations count="2">'
+      + `<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="1" sqref="D2:F${last}"><formula1>"Oui,Non"</formula1></dataValidation>`
+      + `<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="0" sqref="B2:B${last}"><formula1>Projets</formula1></dataValidation>`
+      + '</dataValidations>'
     : '';
 
   return `${XML_HEAD}<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`
@@ -299,12 +307,18 @@ const ROOT_RELS = `${XML_HEAD}<Relationships xmlns="http://schemas.openxmlformat
   + `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>`
   + `</Relationships>`;
 
-const WORKBOOK = `${XML_HEAD}<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">`
+/**
+ * `projectCount` sert au nom défini « Projets », cible de la liste
+ * déroulante de la colonne Projet.
+ */
+const workbookXml = (projectCount) =>
+  `${XML_HEAD}<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">`
   + `<sheets>`
   + `<sheet name="Suivi" sheetId="1" r:id="rId1"/>`
   + `<sheet name="Données" sheetId="2" r:id="rId2"/>`
   + `<sheet name="Synthèse" sheetId="3" r:id="rId3"/>`
   + `</sheets>`
+  + `<definedNames><definedName name="Projets">Données!$B$2:$B$${projectCount + 1}</definedName></definedNames>`
   + `<calcPr calcId="0" fullCalcOnLoad="1"/>`
   + `</workbook>`;
 
@@ -334,7 +348,7 @@ export async function buildSuivi(rows, { location = '', projects } = {}) {
   const zip = new JSZip();
   zip.file('[Content_Types].xml', CONTENT_TYPES);
   zip.file('_rels/.rels', ROOT_RELS);
-  zip.file('xl/workbook.xml', WORKBOOK);
+  zip.file('xl/workbook.xml', workbookXml(list.length));
   zip.file('xl/_rels/workbook.xml.rels', WORKBOOK_RELS);
   zip.file('xl/styles.xml', STYLES_XML);
   zip.file('xl/worksheets/sheet1.xml', suiviSheet(rows, location));

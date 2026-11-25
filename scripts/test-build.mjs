@@ -59,6 +59,17 @@ assert.ok(suivi.includes('<f>MAX(0,(J2-I2+L2-K2)*24-0.5)</f>'), 'formule H2');
 assert.ok(suivi.includes('<f>SUM(H18:H22)</f>'), 'total M22');
 assert.ok(suivi.includes('sqref="D2:F22"'), 'liste déroulante Oui/Non');
 assert.ok(suivi.includes('<formula1>"Oui,Non"</formula1>'), 'valeurs de la liste');
+
+// Liste déroulante des projets sur la colonne B, via le nom défini
+assert.ok(suivi.includes('sqref="B2:B22"'), 'liste déroulante Projet');
+assert.ok(suivi.includes('<formula1>Projets</formula1>'), 'cible = nom défini');
+const wbXml = await zip.file('xl/workbook.xml').async('string');
+assert.ok(
+  wbXml.includes(`<definedName name="Projets">Données!$B$2:$B$${DEFAULT_PROJECTS.length + 1}</definedName>`),
+  'le nom « Projets » couvre toute la liste',
+);
+// Une liste écrite en dur dépasserait la limite Excel de 255 caractères
+assert.ok(DEFAULT_PROJECTS.join(',').length > 255, 'le nom défini est bien nécessaire');
 assert.ok(/state="frozen"/.test(suivi), 'ligne d\'en-tête figée');
 
 // Le 11 novembre est férié : pas d'horaires, 0 h
